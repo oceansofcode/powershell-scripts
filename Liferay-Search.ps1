@@ -16,13 +16,19 @@ $Urls = @{
 };
 
 foreach ($Url in $Urls.GetEnumerator()) {
-    $Res = Invoke-WebRequest $Url.Value
+
+    $Job = Start-Job -Name $Url.Key -ScriptBlock { Invoke-WebRequest $using:Url.Value }
+    Wait-Job -Name $Url.Key | Out-Null
+
+    $Res = Receive-Job $Job    
     $Content = $Res.Content -split "`n" | Where-Object {$_ -ne ''}
     $Match = $Content | Select-String $SearchTerm
 
     if ($Match) {
-        Write-Output "$($Url.Key)`n" -ForegroundColor Green
-        $Content -replace "<[^>]*>", "" | Select-String $SearchTerm
-        Write-Output "`n`n" 
+        Write-host "$($Job.Name)`n" -ForegroundColor Green
+        ($Content -replace "<[^>]*>", "" | Select-String $SearchTerm).Line
+        Write-Output "`n" 
     }
 }
+
+get-job | remove-job
